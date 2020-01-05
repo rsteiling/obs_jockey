@@ -117,9 +117,6 @@ void setup(void)
     Serial.println("BME280 detection failed!");
     while(1);
   }
-  
-  /* Modest delay before doing anything. */
-  delay(250);
 
   /* The Adafruit BNO055 board has an external crystal.  Make sure we use it. */
   bno.setExtCrystalUse(true);
@@ -277,6 +274,26 @@ void handle_set_tach(String params)
   }
 }
 
+void handle_init_bno055(String params)
+{
+  /* The BNO interface only supports a "begin" and no specific "init", so we call it. */
+  if (bno.begin()) {
+    Serial.println(RESP_OK);
+  } else {
+    Serial.println(RESP_ERR);
+  }
+}
+
+void handle_init_bme280(String params)
+{
+  /* The BME supports a specific init, so we'll use it. */
+  if (bme.init()) {
+    Serial.println(RESP_OK);
+  } else {
+    Serial.println(RESP_ERR);
+  }
+}
+
 struct {
   String cmd;
   void (*cmd_handler)(String);
@@ -284,7 +301,9 @@ struct {
   { "tilt", &handle_tilt },
   { "ambient", &handle_ambient },
   { "get_tach", &handle_get_tach },
-  { "set_tach", &handle_set_tach }
+  { "set_tach", &handle_set_tach },
+  { "init_bno055", &handle_init_bno055 },
+  { "init_bme280", &handle_init_bme280 }
 };
 
 void loop()

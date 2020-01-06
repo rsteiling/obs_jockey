@@ -2,6 +2,9 @@
 using System.IO.Ports;
 using System.Threading;
 using System.Linq;
+using System.Net;
+using System.IO;
+using System.Xml;
 
 using Windows.Devices.Enumeration;
 using Windows.Devices.HumanInterfaceDevice;
@@ -10,9 +13,6 @@ using Windows.Storage.Streams;
 
 using RestSharp;
 using Newtonsoft.Json;
-using System.Net;
-using System.IO;
-using System.Xml;
 
 namespace obs_jockey
 {

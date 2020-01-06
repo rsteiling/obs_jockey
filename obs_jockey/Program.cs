@@ -452,7 +452,23 @@ namespace obs_jockey
             public string Message { get; set; }
         }
 
-        static void Main(string[] args)
+        public static float pascalsToInches(float pressure)
+        {
+            return pressure * 0.0002953f;
+        }
+
+        public static float calcSeaPressure(float temperature, float pressure, int altitude)
+        {
+            float adj_temp = temperature + 273.15f;
+            float tempGradient = 0.0065f;
+
+            float v3 = adj_temp + tempGradient * altitude;
+            float sealevelPressure = (float)(pressure / Math.Pow((1 - tempGradient * altitude / v3), .03416f / tempGradient));
+            sealevelPressure = (float)Math.Round(sealevelPressure * 100) / 100;
+            return sealevelPressure;
+        }
+
+        static void Main()
         {
             CyberPowerData ups = new CyberPowerData();
             SerialPort p;
@@ -541,8 +557,8 @@ namespace obs_jockey
                 if (validAmbient)
                 {
                     Console.WriteLine("Temperature: {0:0.00}°C", temp);
-                    Console.WriteLine("Pressure (at elevation): {0:0.00} Pa", pressure);
-                    Console.WriteLine("Pressure (sea level): *TBD*");
+                    Console.WriteLine("Pressure (at altitude): {0:0.00} inHg", pascalsToInches(pressure));
+                    Console.WriteLine("Pressure (sea level): {0:0.00} inHg", pascalsToInches(calcSeaPressure(temp, pressure, _altitude)));
                     Console.WriteLine("Humidity: {0:0.00}%", humidity);
                 }
                 else
@@ -630,5 +646,6 @@ namespace obs_jockey
 
         private const String _port = "COM7";
         private const String _sgp_uri_base = "http://localhost:59590/";
+        private const int    _altitude = 154;
     }
 }

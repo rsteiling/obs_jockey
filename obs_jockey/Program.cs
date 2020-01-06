@@ -390,23 +390,64 @@ namespace obs_jockey
             return p.ReadLine().Trim().CompareTo("OK") == 0;
         }
 
-        static bool QuerySQP(out SgGenericResponse resp)
+        static bool QuerySGPDevice(string device, out SgpDeviceResponse resp)
         {
-            const String uriBase = "http://localhost:59590/";
             IRestClient client = new RestClient();
-            var request = new RestRequest(Method.GET);
-            request.Resource = uriBase + "devicestatus/Camera";
-            request.RequestFormat = DataFormat.Json;
+            var request = new RestRequest(Method.POST)
+            {
+                Resource = _sgp_uri_base + "devicestatus",
+                RequestFormat = DataFormat.Json
+            };
+            request.AddHeader("Accept", "application/json");
+
+            SgpDeviceStatusRequest deviceStatusRequest = new SgpDeviceStatusRequest() { Device = device };
+            request.AddJsonBody(deviceStatusRequest);
+
+            IRestResponse response = client.Execute(request);
+            resp = JsonConvert.DeserializeObject<SgpDeviceResponse>(response.Content);
+
+            return resp != null;
+        }
+
+        static bool QuerySGPScopePosition(out SgpTelescopePosResponse resp)
+        {
+            IRestClient client = new RestClient();
+            var request = new RestRequest(Method.POST)
+            {
+                Resource = _sgp_uri_base + "telescopepos",
+                RequestFormat = DataFormat.Json
+            };
             request.AddHeader("Accept", "application/json");
 
             IRestResponse response = client.Execute(request);
-            resp = JsonConvert.DeserializeObject<SgGenericResponse>(response.Content);
+            resp = JsonConvert.DeserializeObject<SgpTelescopePosResponse>(response.Content);
 
             return resp != null;
         }
 
         public class SgGenericResponse
         {
+            public bool Success { get; set; }
+            public string Message { get; set; }
+        }
+
+        public class SgpTelescopePosResponse
+        {
+            public bool Success { get; set; }
+            public string Message { get; set; }
+            public double Ra { get; set; }
+            public double Dec { get; set; }
+        }
+
+        public class SgpDeviceStatusRequest
+        {
+            public string Device { get; set; }
+        }
+
+        public class SgpDeviceResponse
+        {
+            /* "IDLE", "CAPTURING", "SOLVING", "BUSY", "MOVING", "DISCONNECTED", "PARKED" */
+            public string State { get; set; }
             public bool Success { get; set; }
             public string Message { get; set; }
         }
@@ -468,12 +509,13 @@ namespace obs_jockey
                 bool validAmbient = QueryAmbientData(p, out float temp, out float pressure, out float humidity);
                 bool validFan = QueryFanRate(p, out float tach_rate);
 
-                /* Ping SQP for data. */
-                bool validSGP = false;
-                if (QuerySQP(out SgGenericResponse sg_resp) && sg_resp.Success)
-                {
-                    validSGP = true;
-                }
+                /* Ping SGP for data. */
+                QuerySGPDevice("Telescope", out SgpDeviceResponse sg_telescope_resp);
+                QuerySGPDevice("Camera", out SgpDeviceResponse sg_camera_resp);
+                QuerySGPDevice("FilterWheel", out SgpDeviceResponse sg_fw_resp);
+                QuerySGPDevice("Focuser", out SgpDeviceResponse sg_focuser_resp);
+                QuerySGPScopePosition(out SgpTelescopePosResponse sg_position_resp);
+
 
                 /* Wait for the UPS query to finish before proceeding. */
                 ups.upsDataEvent.WaitOne();
@@ -533,14 +575,46 @@ namespace obs_jockey
                 }
 
                 Console.WriteLine("");
-                Console.WriteLine("-- Sequence Data --");
-                if (validSGP)
+                Console.WriteLine("-- Equipment Status --");
+                if ((sg_telescope_resp != null) && sg_telescope_resp.Success)
                 {
-                    Console.WriteLine(sg_resp.Message);
+                    Console.WriteLine("Telescope: " + sg_telescope_resp.Message);
+                    if ((sg_position_resp != null) && sg_position_resp.Success)
+                    {
+                        Console.WriteLine("\tPosition: {0:0.00} RA / {1:0.00} DEC", sg_position_resp.Ra, sg_position_resp.Dec);
+                    }
+                    else
+                    {
+                        Console.WriteLine("\tWARNING: Unable to query telescope position!");
+                    }
                 }
                 else
                 {
-                    Console.WriteLine("WARNING: SGP query failed!");
+                    Console.WriteLine("WARNING: Telescope query failed!");
+                }
+                if ((sg_camera_resp != null) && sg_camera_resp.Success)
+                {
+                    Console.WriteLine("Camera: " + sg_camera_resp.Message);
+                }
+                else
+                {
+                    Console.WriteLine("WARNING: Camera query failed!");
+                }
+                if ((sg_fw_resp != null) && sg_fw_resp.Success)
+                {
+                    Console.WriteLine("Filter Wheel: " + sg_fw_resp.Message);
+                }
+                else
+                {
+                    Console.WriteLine("WARNING: Filter wheel query failed!");
+                }
+                if ((sg_focuser_resp != null) && sg_focuser_resp.Success)
+                {
+                    Console.WriteLine("Focuser: " + sg_focuser_resp.Message);
+                }
+                else
+                {
+                    Console.WriteLine("WARNING: Focuser query failed!");
                 }
 
                 Console.WriteLine("");
@@ -555,5 +629,6 @@ namespace obs_jockey
         }
 
         private const String _port = "COM7";
+        private const String _sgp_uri_base = "http://localhost:59590/";
     }
 }

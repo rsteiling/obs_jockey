@@ -10,6 +10,9 @@ using Windows.Storage.Streams;
 
 using RestSharp;
 using Newtonsoft.Json;
+using System.Net;
+using System.IO;
+using System.Xml;
 
 namespace obs_jockey
 {
@@ -452,6 +455,76 @@ namespace obs_jockey
             public string Message { get; set; }
         }
 
+        public static void QueryRigRunner(out RigRunnerStatus rrStat)
+        {
+            rrStat = new RigRunnerStatus();
+            WebRequest req = WebRequest.Create(_rr_uri);
+
+            try
+            {
+                WebResponse res = req.GetResponse();
+                Stream dataStream = res.GetResponseStream();
+                StreamReader reader = new StreamReader(dataStream);
+                XmlDocument xml = new XmlDocument();
+                xml.LoadXml(reader.ReadToEnd());
+                reader.Close();
+                res.Close();
+
+                XmlNode node = xml.SelectSingleNode("rr4005i/SUPPLY");
+                rrStat.Supply = Single.Parse(node.InnerText);
+
+                node = xml.SelectSingleNode("rr4005i/RAILENA0");
+                rrStat.Rail0_enabled = (Int32.Parse(node.InnerText) != 0);
+
+                node = xml.SelectSingleNode("rr4005i/RAILENA1");
+                rrStat.Rail1_enabled = (Int32.Parse(node.InnerText) != 0);
+
+                node = xml.SelectSingleNode("rr4005i/RAILENA2");
+                rrStat.Rail2_enabled = (Int32.Parse(node.InnerText) != 0);
+
+                node = xml.SelectSingleNode("rr4005i/RAILENA3");
+                rrStat.Rail3_enabled = (Int32.Parse(node.InnerText) != 0);
+
+                node = xml.SelectSingleNode("rr4005i/RAILENA4");
+                rrStat.Rail4_enabled = (Int32.Parse(node.InnerText) != 0);
+
+                node = xml.SelectSingleNode("rr4005i/RAILLOAD0");
+                rrStat.Rail0_load = Single.Parse(node.InnerText);
+
+                node = xml.SelectSingleNode("rr4005i/RAILLOAD1");
+                rrStat.Rail1_load = Single.Parse(node.InnerText);
+
+                node = xml.SelectSingleNode("rr4005i/RAILLOAD2");
+                rrStat.Rail2_load = Single.Parse(node.InnerText);
+
+                node = xml.SelectSingleNode("rr4005i/RAILLOAD3");
+                rrStat.Rail3_load = Single.Parse(node.InnerText);
+
+                node = xml.SelectSingleNode("rr4005i/RAILLOAD4");
+                rrStat.Rail4_load = Single.Parse(node.InnerText);
+            }
+            catch (Exception)
+            {
+                /* Not a great thing if the power supply is off! */
+                rrStat = null;
+            }
+        }
+
+        public class RigRunnerStatus
+        {
+            public float Supply { get; set; }
+            public float Rail0_load { get; set; }
+            public float Rail1_load { get; set; }
+            public float Rail2_load { get; set; }
+            public float Rail3_load { get; set; }
+            public float Rail4_load { get; set; }
+            public bool Rail0_enabled { get; set; }
+            public bool Rail1_enabled { get; set; }
+            public bool Rail2_enabled { get; set; }
+            public bool Rail3_enabled { get; set; }
+            public bool Rail4_enabled { get; set; }
+        }
+
         public static float pascalsToInches(float pressure)
         {
             return pressure * 0.0002953f;
@@ -532,6 +605,7 @@ namespace obs_jockey
                 QuerySGPDevice("Focuser", out SgpDeviceResponse sg_focuser_resp);
                 QuerySGPScopePosition(out SgpTelescopePosResponse sg_position_resp);
 
+                QueryRigRunner(out RigRunnerStatus rr_status);
 
                 /* Wait for the UPS query to finish before proceeding. */
                 ups.upsDataEvent.WaitOne();
@@ -597,7 +671,7 @@ namespace obs_jockey
                     Console.WriteLine("Telescope: " + sg_telescope_resp.Message);
                     if ((sg_position_resp != null) && sg_position_resp.Success)
                     {
-                        Console.WriteLine("\tPosition: {0:0.00} RA / {1:0.00} DEC", sg_position_resp.Ra, sg_position_resp.Dec);
+                        Console.WriteLine(" └ Position: {0:0.00} RA / {1:0.00} DEC", sg_position_resp.Ra, sg_position_resp.Dec);
                     }
                     else
                     {
@@ -634,6 +708,44 @@ namespace obs_jockey
                 }
 
                 Console.WriteLine("");
+                Console.WriteLine("-- Power Status --");
+                if (rr_status != null)
+                {
+                    Console.WriteLine("Main Supply: {0:0.00}V", rr_status.Supply);
+                    Console.WriteLine(" └ Total Load: {0:0.00}A", rr_status.Rail0_load + rr_status.Rail1_load + rr_status.Rail2_load + rr_status.Rail3_load + rr_status.Rail4_load);
+                    Console.WriteLine("LattePanda: {0}", rr_status.Rail0_enabled ? "ON" : "OFF");
+                    if (rr_status.Rail0_enabled)
+                    {
+                        Console.WriteLine(" └ Load: {0:0.00}A", rr_status.Rail0_load);
+                    }
+                    Console.WriteLine("STF-8300M: {0}", rr_status.Rail1_enabled ? "ON" : "OFF");
+                    if (rr_status.Rail1_enabled)
+                    {
+                        Console.WriteLine(" └ Load: {0:0.00}A", rr_status.Rail1_load);
+                    }
+                    Console.WriteLine("Mesu 200 MkII: {0}", rr_status.Rail2_enabled ? "ON" : "OFF");
+                    if (rr_status.Rail2_enabled)
+                    {
+                        Console.WriteLine(" └ Load: {0:0.00}A", rr_status.Rail2_load);
+                    }
+                    Console.WriteLine("Starlight Focuser Boss II: {0}", rr_status.Rail3_enabled ? "ON" : "OFF");
+                    if (rr_status.Rail3_enabled)
+                    {
+                        Console.WriteLine(" └ Load: {0:0.00}A", rr_status.Rail3_load);
+                    }
+                    Console.WriteLine("Aux Rail: {0}", rr_status.Rail4_enabled ? "ON" : "OFF");
+                    if (rr_status.Rail4_enabled)
+                    {
+                        Console.WriteLine(" └ Load: {0:0.00}A", rr_status.Rail4_load);
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("WARNING: RigRunner is offline!");
+                }
+                
+
+                Console.WriteLine("");
                 Console.WriteLine("**************************");
 
                 Console.WriteLine("");
@@ -646,6 +758,7 @@ namespace obs_jockey
 
         private const String _port = "COM7";
         private const String _sgp_uri_base = "http://localhost:59590/";
+        private const String _rr_uri  = "http://172.20.0.157/status.xml";
         private const int    _altitude = 154;
     }
 }

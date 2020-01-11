@@ -3,6 +3,7 @@ using System.IO.Ports;
 using System.Threading;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
 using System.IO;
 using System.Xml;
 
@@ -465,7 +466,7 @@ namespace obs_jockey
         public static void QueryRigRunner(out RigRunnerStatus rrStat)
         {
             rrStat = new RigRunnerStatus();
-            WebRequest req = WebRequest.Create(_rr_uri);
+            WebRequest req = WebRequest.Create(_rr_base_uri + "status.xml");
 
             try
             {
@@ -532,6 +533,12 @@ namespace obs_jockey
             public bool Rail4_enabled { get; set; }
         }
 
+        static async void RigRunnerTest(String cmd)
+        {
+            var responseString = await _rig_runner_client.GetStringAsync(_rr_base_uri + "?" + cmd);
+            _rrDataEvent.Set();
+        }
+
         public static float pascalsToInches(float pressure)
         {
             return pressure * 0.0002953f;
@@ -585,6 +592,15 @@ namespace obs_jockey
                 p.Close();
                 return;
             }
+
+            Console.WriteLine("RigRunner Test 1...");
+            RigRunnerTest("RAILENA2=1");
+            _rrDataEvent.WaitOne();
+            Thread.Sleep(1000);
+            Console.WriteLine("RigRunner Test 2...");
+            RigRunnerTest("RAILENA2=0");
+            _rrDataEvent.WaitOne();
+            Thread.Sleep(1000);
 
             for (int i = 0; i < 100; i++)
             {
@@ -762,7 +778,9 @@ namespace obs_jockey
 
         private const String _port = "COM7";
         private const String _sgp_uri_base = "http://localhost:59590/";
-        private const String _rr_uri  = "http://172.20.0.157/status.xml";
+        private const String _rr_base_uri  = "http://172.20.0.157/";
         private const int    _altitude = 154;
+        private static readonly HttpClient _rig_runner_client = new HttpClient();
+        private static ManualResetEvent _rrDataEvent = new ManualResetEvent(false);
     }
 }

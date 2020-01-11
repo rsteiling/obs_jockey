@@ -101,7 +101,7 @@ void setup(void)
   /* BNO55 Reset */
   pinMode(4, OUTPUT);
   digitalWrite(4, LOW);
-  delay(10);
+  delay(100);
   digitalWrite(4, HIGH);
 
   /* Start the BNO055 (tilt) sensor */

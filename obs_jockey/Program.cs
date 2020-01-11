@@ -286,6 +286,7 @@ namespace obs_jockey
             new UPSPowerEntryInt(0x0c, 0, 8, "Audible Alarm Control", ""),              /* Power Summary Group */
             new UPSPowerEntryInt(0x10, 0, 16, "Low Voltage Transfer", "VAC"),           /* Input Group */
             new UPSPowerEntryInt(0x10, 16, 16, "High Voltage Transfer", "VAC"),         /* Input Group */
+            /* The following group values exist but are worthless for our purposes. */
             //new UPSPowerEntryInt(0x14, 0, 8, "Test"),                                 /* Output Group */
             //new UPSPowerEntryInt(0x1a, 0, 8, "ff010043")                              /* Output Group */
         };
@@ -393,6 +394,12 @@ namespace obs_jockey
             return p.ReadLine().Trim().CompareTo("OK") == 0;
         }
 
+        static IRestResponse ExecuteRestRequest(IRestClient client, RestRequest request)
+        {
+            client.Timeout = 50;
+            return client.Execute(request);
+        }
+
         static bool QuerySGPDevice(string device, out SgpDeviceResponse resp)
         {
             IRestClient client = new RestClient();
@@ -406,7 +413,7 @@ namespace obs_jockey
             SgpDeviceStatusRequest deviceStatusRequest = new SgpDeviceStatusRequest() { Device = device };
             request.AddJsonBody(deviceStatusRequest);
 
-            IRestResponse response = client.Execute(request);
+            IRestResponse response = ExecuteRestRequest(client, request);
             resp = JsonConvert.DeserializeObject<SgpDeviceResponse>(response.Content);
 
             return resp != null;
@@ -422,7 +429,7 @@ namespace obs_jockey
             };
             request.AddHeader("Accept", "application/json");
 
-            IRestResponse response = client.Execute(request);
+            IRestResponse response = ExecuteRestRequest(client, request);
             resp = JsonConvert.DeserializeObject<SgpTelescopePosResponse>(response.Content);
 
             return resp != null;
@@ -579,19 +586,12 @@ namespace obs_jockey
                 return;
             }
 
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 100; i++)
             {
                 /* Start a query of the UPS data. */
-                bool validUPS = false;
-                try
-                {
-                    ups.RefreshData();
-                    validUPS = true;
-                }
-                catch (Exception)
-                {
-                    /* Validity is already set.  Do something else? */
-                }
+                ups.RefreshData();
+                /* FIXME: This isn't correct (obviously); should move UPS stuff to a class and save state. */
+                bool validUPS = true;
 
                 /* Query all sensor data. */
                 bool validTilt = QueryTiltData(p, out float x, out float y, out float z);
@@ -614,7 +614,8 @@ namespace obs_jockey
                  * FIXME: This is temporary during initial development.
                  */
                 Console.WriteLine("**************************");
-                Console.WriteLine("");
+                Console.WriteLine(" Pass " + i);
+                Console.WriteLine("**************************");
 
                 Console.WriteLine("-- UPS Data --");
                 if (validUPS)
@@ -669,13 +670,16 @@ namespace obs_jockey
                 if ((sg_telescope_resp != null) && sg_telescope_resp.Success)
                 {
                     Console.WriteLine("Telescope: " + sg_telescope_resp.Message);
-                    if ((sg_position_resp != null) && sg_position_resp.Success)
+                    if (sg_telescope_resp.State != "DISCONNECTED")
                     {
-                        Console.WriteLine(" └ Position: {0:0.00} RA / {1:0.00} DEC", sg_position_resp.Ra, sg_position_resp.Dec);
-                    }
-                    else
-                    {
-                        Console.WriteLine("\tWARNING: Unable to query telescope position!");
+                        if ((sg_position_resp != null) && sg_position_resp.Success)
+                        {
+                            Console.WriteLine(" └ Position: {0:0.00} RA / {1:0.00} DEC", sg_position_resp.Ra, sg_position_resp.Dec);
+                        }
+                        else
+                        {
+                            Console.WriteLine("\tWARNING: Unable to query telescope position!");
+                        }
                     }
                 }
                 else
@@ -750,7 +754,7 @@ namespace obs_jockey
 
                 Console.WriteLine("");
 
-                Thread.Sleep(1000);
+                Thread.Sleep(250);
             }
 
             p.Close();

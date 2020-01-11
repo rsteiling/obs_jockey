@@ -15,7 +15,7 @@ using Windows.Storage.Streams;
 using RestSharp;
 using Newtonsoft.Json;
 
-namespace obs_jockey
+namespace ObsJockey
 {
     public abstract class UPSPowerEntry : IComparable<UPSPowerEntry>
     {

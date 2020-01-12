@@ -6,6 +6,22 @@ namespace ObsJockey
 {
     class Program
     {
+        static String FilterPosToString(int pos)
+        {
+            String retval = "ERROR";
+
+            if (pos == -1)
+            {
+                retval = "[MOVING]";
+            }
+            else if (pos >= 1 && pos <= 8)
+            {
+                retval = fw_mapping[pos - 1];
+            }
+
+            return retval;
+        }
+
         static void Main()
         {
             CyberPowerData ups = new CyberPowerData();
@@ -45,12 +61,10 @@ namespace ObsJockey
             }
 
             Console.WriteLine("RigRunner Test 1...");
-            RigRunner.RigRunnerTest("RAILENA2=1");
-            RigRunner._rrDataEvent.WaitOne();
+            RigRunner.SetPower(2, true);
             Thread.Sleep(1000);
             Console.WriteLine("RigRunner Test 2...");
-            RigRunner.RigRunnerTest("RAILENA2=0");
-            RigRunner._rrDataEvent.WaitOne();
+            RigRunner.SetPower(2, false);
             Thread.Sleep(1000);
 
             for (int i = 0; i < 100; i++)
@@ -71,6 +85,9 @@ namespace ObsJockey
                 SequenceGeneratorPro.QuerySGPDevice("FilterWheel", out SequenceGeneratorPro.SgpDeviceResponse sg_fw_resp);
                 SequenceGeneratorPro.QuerySGPDevice("Focuser", out SequenceGeneratorPro.SgpDeviceResponse sg_focuser_resp);
                 SequenceGeneratorPro.QuerySGPScopePosition(out SequenceGeneratorPro.SgpTelescopePosResponse sg_position_resp);
+                SequenceGeneratorPro.QuerySGPFilterPosition(out SequenceGeneratorPro.SgpFilterPosResponse sg_filterpos_resp);
+                SequenceGeneratorPro.QuerySGPFocuserPosition(out SequenceGeneratorPro.SgpFocuserPosResponse sg_focuspos_resp);
+                SequenceGeneratorPro.QuerySGPCameraTemp(out SequenceGeneratorPro.SgpCameraTempResponse sg_cameratemp_resp);
 
                 RigRunner.QueryRigRunner(out RigRunner.RigRunnerStatus rr_status);
 
@@ -153,25 +170,61 @@ namespace ObsJockey
                 {
                     Console.WriteLine("WARNING: Telescope query failed!");
                 }
+
                 if ((sg_camera_resp != null) && sg_camera_resp.Success)
                 {
                     Console.WriteLine("Camera: " + sg_camera_resp.Message);
+                    if (sg_camera_resp.State != "DISCONNECTED")
+                    {
+                        if ((sg_cameratemp_resp != null) && sg_cameratemp_resp.Success)
+                        {
+                            Console.WriteLine(" └ Temperature: {0:0.0}°C", sg_cameratemp_resp.Temperature);
+                        }
+                        else
+                        {
+                            Console.WriteLine("\tWARNING: Unable to query filter wheel position!");
+                        }
+                    }
                 }
                 else
                 {
                     Console.WriteLine("WARNING: Camera query failed!");
                 }
+
                 if ((sg_fw_resp != null) && sg_fw_resp.Success)
                 {
                     Console.WriteLine("Filter Wheel: " + sg_fw_resp.Message);
+                    if (sg_fw_resp.State != "DISCONNECTED")
+                    {
+                        if ((sg_filterpos_resp != null) && sg_filterpos_resp.Success)
+                        {
+                            Console.WriteLine(" └ Position: " + FilterPosToString(sg_filterpos_resp.Position));
+                        }
+                        else
+                        {
+                            Console.WriteLine("\tWARNING: Unable to query filter wheel position!");
+                        }
+                    }
                 }
                 else
                 {
                     Console.WriteLine("WARNING: Filter wheel query failed!");
                 }
+
                 if ((sg_focuser_resp != null) && sg_focuser_resp.Success)
                 {
                     Console.WriteLine("Focuser: " + sg_focuser_resp.Message);
+                    if (sg_focuser_resp.State != "DISCONNECTED")
+                    {
+                        if ((sg_focuspos_resp != null) && sg_focuser_resp.Success)
+                        {
+                            Console.WriteLine(" └ Position: " + sg_focuspos_resp.Position);
+                        }
+                        else
+                        {
+                            Console.WriteLine("\tWARNING: Unable to query filter wheel position!");
+                        }
+                    }
                 }
                 else
                 {
@@ -229,5 +282,17 @@ namespace ObsJockey
 
         private const String _port = "COM7";
         private const int    _altitude = 154;
+
+        private static readonly String[] fw_mapping =
+        {
+                "Red",
+                "Green",
+                "Blue",
+                "Luminance",
+                "Ha",
+                "OIII",
+                "SII",
+                "[Unpopulated]"
+        };
     }
 }

@@ -9,10 +9,24 @@ namespace ObsJockey
 {
     class RigRunner
     {
-        public static async void RigRunnerTest(String cmd)
+        private static async void PostCommand(String get_phrase)
         {
-            var responseString = await _rig_runner_client.GetStringAsync(_rr_base_uri + "?" + cmd);
+            var responseString = await _rig_runner_client.GetStringAsync(_rr_base_uri + "?" + get_phrase);
             _rrDataEvent.Set();
+        }
+
+        public static void SetPower(int channel, bool enable)
+        {
+            if (channel < 0 || channel > 4)
+            {
+                throw new ArgumentException("RigRunner channel can only be 0-4", "channel");
+            }
+
+            /* Issue the GET to the RigRunner. */
+            PostCommand("RAILENA" + channel + "=" + (enable ? "1" : "0"));
+
+            /* Block until it completes. */
+            RigRunner._rrDataEvent.WaitOne();
         }
 
         public static void QueryRigRunner(out RigRunnerStatus rrStat)
@@ -87,6 +101,6 @@ namespace ObsJockey
 
         private const String _rr_base_uri = "http://172.20.0.157/";
         private static readonly HttpClient _rig_runner_client = new HttpClient();
-        public static ManualResetEvent _rrDataEvent = new ManualResetEvent(false);
+        private static ManualResetEvent _rrDataEvent = new ManualResetEvent(false);
     }
 }
